@@ -7,22 +7,16 @@
 REALM="MYSERVER.COM"
 DOMAIN="mylabserver.com"
 IPKDC=172.31.111.114
-IPSERVER=0.0.0.0
-IPCLIENT=0.0.0.0
+IPSERVER=172.31.124.129
+IPCLIENT=172.31.125.24
 HOSTS="/etc/hosts"
 HOSTKDC="garfield99996.mylabserver.com"
-HOSTSERVER="garfield99995.mylabserver.com"
-HOSTCLIENT="garfield99994.mylabserver.com"
-KDADMFILE="/var/kerberos/krb5kdc/kadm5.acl"
-KDCCONFFILE="/var/kerberos/krb5kdc/kdc.conf"
+HOSTSERVER="garfield99994.mylabserver.com"
+HOSTCLIENT="garfield99995.mylabserver.com"
 KRBCONFFILE="/etc/krb5.conf"
 KRBCONFBKFILE="/etc/krb5_backup.conf"
 
-
-KDCROOTPASSWD="redhat"
 USER1="krbtest"
-PASSWORD1="redhat"
-
 
 # End of user inputs
 
@@ -45,14 +39,6 @@ echo "$IPSERVER $HOSTSERVER" >> $HOSTS
 echo "$IPCLIENT $HOSTCLIENT" >> $HOSTS
 
 
-if yum list installed $CLIENTPACKAGES > /dev/null 2>&1
-then
-	echo "Removing packages............."
-	yum -y -q remove $KDCPACKAGES > /dev/null 2>&1
-	rm -rf /var/kerberos/krb5kdc	
-	echo "Done"
-fi
-
 echo "Installing $CLIENTPACKAGES"
 yum -y -q install $CLIENTPACKAGES > /dev/null 2>&1
 echo "Done"
@@ -68,18 +54,18 @@ else
 	cp -f $KRBCONFFILE $KRBCONFBKFILE
 fi
 
+
 echo "Updating krb5.conf"
 sed -i "s/#.*default_realm.*/default_realm = $REALM/" $KRBCONFFILE
-sed -i "s/#.*EXAMPLE.COM.*/$REALM = {/" $KRBCONFFILE
 sed -i "s/#.*kdc.*/kdc = $HOSTKDC/" $KRBCONFFILE
 sed -i "s/#.*admin_server.*/admin_server = $HOSTKDC/" $KRBCONFFILE
 sed -i "s/#.*}/}/" $KRBCONFFILE
-sed -i "s/#.*.example.com.*/.$DOMAIN = $REALM/" $KRBCONFFILE
-sed -i "s/#.*example.com.*/$DOMAIN = $REALM/" $KRBCONFFILE
+sed -i "s/#.*.example.com.*=.*EXAMPLE.COM.*/.$DOMAIN = $REALM/" $KRBCONFFILE
+sed -i "s/#.*example.com.*=.*EXAMPLE.COM.*/$DOMAIN = $REALM/" $KRBCONFFILE
+# Not sure why but the EXAMPLE.COM is changing example.com as well. This section of code can be
+# cleaned up
+sed -i "s/#.*EXAMPLE.COM.*/$REALM = {/" $KRBCONFFILE
 
-echo "Creating KDC database"
-kdb5_util create -s -P $KDCDBPASSWORD -r $REALM
-
-kadmin.local -q "addprinc -pw $KDCROOTPASSWD root/admin"
-kadmin.local -q "addprinc -pw $PASSWORD1 $USER1"
-
+# Adding test user
+userdel -f -r $USER1
+useradd $USER1

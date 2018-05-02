@@ -7,12 +7,12 @@
 REALM="MYSERVER.COM"
 DOMAIN="mylabserver.com"
 IPKDC=172.31.111.114
-IPSERVER=0.0.0.0
+IPSERVER=172.31.124.129
 IPCLIENT=172.31.125.24
 HOSTS="/etc/hosts"
 HOSTKDC="garfield99996.mylabserver.com"
-HOSTSERVER="garfield99995.mylabserver.com"
-HOSTCLIENT="garfield99994.mylabserver.com"
+HOSTSERVER="garfield99994.mylabserver.com"
+HOSTCLIENT="garfield99995.mylabserver.com"
 KDADMFILE="/var/kerberos/krb5kdc/kadm5.acl"
 KDCCONFFILE="/var/kerberos/krb5kdc/kdc.conf"
 KRBCONFFILE="/etc/krb5.conf"
@@ -24,16 +24,13 @@ KDCROOTPASSWD="redhat"
 USER1="krbtest"
 PASSWORD1="redhat"
 
-
-#FIREWALL="yes"
-FIREWALL="no"
+# Firewalld must eb up and running
+FIREWALL="yes"
+#FIREWALL="no"
 # End of user inputs
 
 
 KDCPACKAGES="krb5-server"
-SERVERPACKAGES="krb5-workstation"
-CLIENTPACKAGES="krb5-workstation pam_krb5"
-
 
 if [[ $EUID != "0" ]]
 then
@@ -51,16 +48,15 @@ echo "$IPCLIENT $HOSTCLIENT" >> $HOSTS
 
 
 if yum list installed $KDCPACKAGES > /dev/null 2>&1
-#if yum list installed $KDCPACKAGES
 then
 	systemctl is-active -q krb5kdc && {
 		systemctl stop krb5kdc
-		sytemctl disable krb5kdc
+		systemctl -q disable krb5kdc
 	}
 
 	systemctl is-active -q kadmin && {
 		systemctl stop kadmin
-		sytemctl disable kadmin
+		systemctl -q disable kadmin
 	}
 	echo "Removing packages............."
 	yum -y -q remove $KDCPACKAGES > /dev/null 2>&1
@@ -82,32 +78,45 @@ sed -i "s/EXAMPLE.COM/$REALM/" $KDADMFILE
 # exist
 if [ -f $KRBCONFBKFILE ]
 then
-	echo "Backup file exists"
 	cp -f $KRBCONFBKFILE $KRBCONFFILE
 else
-	echo "Creating backup file"
 	cp -f $KRBCONFFILE $KRBCONFBKFILE
 fi
 
 echo "Updating krb5.conf"
 sed -i "s/#.*default_realm.*/default_realm = $REALM/" $KRBCONFFILE
-sed -i "s/#.*EXAMPLE.COM.*/$REALM = {/" $KRBCONFFILE
 sed -i "s/#.*kdc.*/kdc = $HOSTKDC/" $KRBCONFFILE
 sed -i "s/#.*admin_server.*/admin_server = $HOSTKDC/" $KRBCONFFILE
 sed -i "s/#.*}/}/" $KRBCONFFILE
-sed -i "s/#.*.example.com.*/.$DOMAIN = $REALM/" $KRBCONFFILE
-sed -i "s/#.*example.com.*/$DOMAIN = $REALM/" $KRBCONFFILE
+sed -i "s/#.*.example.com.*=.*EXAMPLE.COM.*/.$DOMAIN = $REALM/" $KRBCONFFILE
+sed -i "s/#.*example.com.*=.*EXAMPLE.COM.*/$DOMAIN = $REALM/" $KRBCONFFILE
+# Not sure why but the EXAMPLE.COM is changing example.com as well. This section of code can be
+# cleaned up
+sed -i "s/#.*EXAMPLE.COM.*/$REALM = {/" $KRBCONFFILE
 
 echo "Creating KDC database"
-kdb5_util create -s -P $KDCDBPASSWORD -r $REALM
+kdb5_util create -s -P $KDCDBPASSWORD -r $REALM > /dev/null 2>&1
+echo "Done"
 
 systemctl start krb5kdc
 systemctl start kadmin
 
-kadmin.local -q "addprinc -pw $KDCROOTPASSWD root/admin"
-kadmin.local -q "addprinc -pw $PASSWORD1 $USER1"
+kadmin.local -q "addprinc -pw $KDCROOTPASSWD root/admin" > /dev/null 2>&1
+kadmin.local -q "addprinc -pw $PASSWORD1 $USER1" > /dev/null 2>&1
+
+if [[ $FIREWALL == "yes" ]]
+then
+	echo "Making firewall changes"
+	firewall-cmd -q --permanent --add-port 88/tcp
+	firewall-cmd -q --permanent --add-port 88/udp
+	firewall-cmd -q --permanent --add-port 749/tcp
+	firewall-cmd -q --reload
+	echo "Done"
+fi
 
 systemctl restart krb5kdc
 systemctl restart kadmin
-systemctl enable krb5kdc
-systemctl enable kadmin
+systemctl -q enable krb5kdc
+systemctl -q enable kadmin
+
+echo "KDC SERVER CREATED"
