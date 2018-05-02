@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Setup KDC server on RHEL/Centos 7. First just setting up a ssh server. More services can
-# be added later
+# Setup a login server on RHEL/Centos 7 using kerberos authentication.
 
 # Start of user inputs
 REALM="MYSERVER.COM"
@@ -22,15 +21,15 @@ KRBCONFBKFILE="/etc/krb5_backup.conf"
 KDCDBPASSWORD="redhat"
 KDCROOTPASSWD="redhat"
 USER1="krbtest"
-PASSWORD1="redhat"
 
+# The host service is used for login or ssh
+SERVICE1="host/$HOSTSERVER"
 
 #FIREWALL="yes"
 FIREWALL="no"
 # End of user inputs
 
 
-KDCPACKAGES="krb5-server"
 SERVERPACKAGES="krb5-workstation"
 CLIENTPACKAGES="krb5-workstation pam_krb5"
 
@@ -50,33 +49,9 @@ echo "$IPSERVER $HOSTSERVER" >> $HOSTS
 echo "$IPCLIENT $HOSTCLIENT" >> $HOSTS
 
 
-if yum list installed $KDCPACKAGES > /dev/null 2>&1
-#if yum list installed $KDCPACKAGES
-then
-	systemctl is-active -q krb5kdc && {
-		systemctl stop krb5kdc
-		sytemctl disable krb5kdc
-	}
-
-	systemctl is-active -q kadmin && {
-		systemctl stop kadmin
-		sytemctl disable kadmin
-	}
-	echo "Removing packages............."
-	yum -y -q remove $KDCPACKAGES > /dev/null 2>&1
-	rm -rf /var/kerberos/krb5kdc	
-	echo "Done"
-fi
-
-echo "Installing $KDCPACKAGES"
-yum -y -q install $KDCPACKAGES > /dev/null 2>&1
+echo "Installing $SERVERPACKAGES"
+yum -y -q install $SERVERPACKAGES > /dev/null 2>&1
 echo "Done"
-
-echo "Updating kdc.conf"
-sed -i "s/EXAMPLE.COM/$REALM/" $KDCCONFFILE
-
-echo "Updating kadm5.acl"
-sed -i "s/EXAMPLE.COM/$REALM/" $KDADMFILE
 
 # This file is installed by krb5-libs which comes pre-installed. Make a backup if one doesnt already
 # exist
@@ -98,16 +73,9 @@ sed -i "s/#.*}/}/" $KRBCONFFILE
 sed -i "s/#.*.example.com.*/.$DOMAIN = $REALM/" $KRBCONFFILE
 sed -i "s/#.*example.com.*/$DOMAIN = $REALM/" $KRBCONFFILE
 
-echo "Creating KDC database"
-kdb5_util create -s -P $KDCDBPASSWORD -r $REALM
+# Add the host service to the KDC database and save the key to a local keytab file
+kadmin -w $KDCDBPASSWORD -q "addprinc -randkey $SERVICE"
+kadmin -w $KDCDBPASSWORD -q "ktadd $SERVICE"
 
-systemctl start krb5kdc
-systemctl start kadmin
-
-kadmin.local -q "addprinc -pw $KDCROOTPASSWD root/admin"
-kadmin.local -q "addprinc -pw $PASSWORD1 $USER1"
-
-systemctl restart krb5kdc
-systemctl restart kadmin
-systemctl enable krb5kdc
-systemctl enable kadmin
+# Add user for testing
+useradd $USER1
