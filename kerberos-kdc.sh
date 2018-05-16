@@ -1,18 +1,9 @@
 #!/bin/bash
 #
-# Setup KDC server on RHEL/Centos 7. First just setting up a ssh server. More services can
-# be added later
+# Setup KDC server on RHEL/Centos 7. 
+# All common inputs in inputs.sh
 
 # Start of user inputs
-REALM="MYSERVER.COM"
-DOMAIN="mylabserver.com"
-IPKDC=172.31.111.114
-IPSERVER=172.31.124.129
-IPCLIENT=172.31.125.24
-HOSTS="/etc/hosts"
-HOSTKDC="garfield99996.mylabserver.com"
-HOSTSERVER="garfield99994.mylabserver.com"
-HOSTCLIENT="garfield99995.mylabserver.com"
 KDADMFILE="/var/kerberos/krb5kdc/kadm5.acl"
 KDCCONFFILE="/var/kerberos/krb5kdc/kdc.conf"
 KRBCONFFILE="/etc/krb5.conf"
@@ -29,13 +20,17 @@ FIREWALL="yes"
 #FIREWALL="no"
 # End of user inputs
 
-
+source ./inputs.sh
 KDCPACKAGES="krb5-server"
 
 if [[ $EUID != "0" ]]
 then
 	echo "ERROR. You need to have root privileges to run this script"
 	exit 1
+else
+	echo "This script will install KDC on this machine"
+	echo "It will create a testuser - krbtest"
+	echo "It will create keytab files for ( ${SERVICES[*]} ) services in the /tmp directory"
 fi
 
 # Comment out all existing entries for the host names from /etc/hosts
@@ -104,14 +99,31 @@ systemctl start kadmin
 kadmin.local -q "addprinc -pw $KDCROOTPASSWD root/admin" > /dev/null 2>&1
 kadmin.local -q "addprinc -pw $PASSWORD1 $USER1" > /dev/null 2>&1
 
+rm -f $SERVERKEYTABFILE
+rm -f $CLIENTKEYTABFILE
+for SERVICE in ${SERVICES[@]}
+do
+	kadmin.local -q "delprinc -force $SERVICE/$HOSTSERVER"
+	kadmin.local -q "addprinc -randkey $SERVICE/$HOSTSERVER"
+	kadmin.local -q "ktadd -k $SERVERKEYTABFILE $SERVICE/$HOSTSERVER"
+	kadmin.local -q "delprinc -force $SERVICE/$HOSTCLIENT"
+	kadmin.local -q "addprinc -randkey $SERVICE/$HOSTCLIENT"
+	kadmin.local -q "ktadd -k $CLIENTKEYTABFILE $SERVICE/$HOSTCLIENT"
+done
+
 if [[ $FIREWALL == "yes" ]]
 then
-	echo "Making firewall changes"
-	firewall-cmd -q --permanent --add-port 88/tcp
-	firewall-cmd -q --permanent --add-port 88/udp
-	firewall-cmd -q --permanent --add-port 749/tcp
-	firewall-cmd -q --reload
-	echo "Done"
+	if systemctl is-active -q firewalld
+	then
+		echo "Making firewall changes"
+		firewall-cmd -q --permanent --add-port 88/tcp
+		firewall-cmd -q --permanent --add-port 88/udp
+		firewall-cmd -q --permanent --add-port 749/tcp
+		firewall-cmd -q --reload
+		echo "Done"
+	else
+		echo "Firewalld not running. No changes made to firewall"
+	fi
 fi
 
 systemctl restart krb5kdc
