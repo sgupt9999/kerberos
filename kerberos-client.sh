@@ -51,16 +51,10 @@ fi
 
 
 echo "Updating krb5.conf"
-sed -i "s/#.*default_realm.*/default_realm = $REALM/" $KRBCONFFILE
-sed -i "s/#.*kdc.*/kdc = $HOSTKDC/" $KRBCONFFILE
-sed -i "s/#.*admin_server.*/admin_server = $HOSTKDC/" $KRBCONFFILE
-sed -i "s/#.*}/}/" $KRBCONFFILE
-sed -i "s/#.*.example.com.*=.*EXAMPLE.COM.*/.$DOMAIN = $REALM/" $KRBCONFFILE
-sed -i "s/#.*example.com.*=.*EXAMPLE.COM.*/$DOMAIN = $REALM/" $KRBCONFFILE
-# Not sure why but the EXAMPLE.COM is changing example.com as well. This section of code can be
-# cleaned up
-sed -i "s/#.*EXAMPLE.COM.*/$REALM = {/" $KRBCONFFILE
-
+sed -i "s/#//g" $KRBCONFFILE
+sed -i "s/EXAMPLE.COM/$REALM/g" $KRBCONFFILE
+sed -i "s/kerberos.example.com/$HOSTKDC/g" $KRBCONFFILE
+sed -i "s/example.com/$DOMAIN/g" $KRBCONFFILE
 
 for SERVICE in ${SERVICES[@]}
 do
