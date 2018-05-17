@@ -1,33 +1,28 @@
 #!/bin/bash
 #
-# Setup KDC server on RHEL/Centos 7. First just setting up a ssh server. More services can
-# be added later
+# Setting up a kerberos client for all requested services
+# It will also create a test user krbtest
 
 # Start of user inputs
-REALM="MYSERVER.COM"
-DOMAIN="mylabserver.com"
-IPKDC=172.31.111.114
-IPSERVER=172.31.124.129
-IPCLIENT=172.31.125.24
-HOSTS="/etc/hosts"
-HOSTKDC="garfield99996.mylabserver.com"
-HOSTSERVER="garfield99994.mylabserver.com"
-HOSTCLIENT="garfield99995.mylabserver.com"
+###########################################################################
 KRBCONFFILE="/etc/krb5.conf"
 KRBCONFBKFILE="/etc/krb5_backup.conf"
-
+KDCROOTPASSWORD="redhat"
 USER1="krbtest"
-
+###########################################################################
 # End of user inputs
 
-
-CLIENTPACKAGES="krb5-workstation pam_krb5"
+source ./inputs.sh
+CLIENTPACKAGES="krb5-workstation"
 
 
 if [[ $EUID != "0" ]]
 then
 	echo "ERROR. You need to have root privileges to run this script"
 	exit 1
+else
+	echo "Setting up authentication for all requested kerberos services"
+	echo "Also creating a test user krbtest" 
 fi
 
 # Comment out all existing entries for the host names from /etc/hosts
@@ -65,6 +60,15 @@ sed -i "s/#.*example.com.*=.*EXAMPLE.COM.*/$DOMAIN = $REALM/" $KRBCONFFILE
 # Not sure why but the EXAMPLE.COM is changing example.com as well. This section of code can be
 # cleaned up
 sed -i "s/#.*EXAMPLE.COM.*/$REALM = {/" $KRBCONFFILE
+
+
+for SERVICE in ${SERVICES[@]}
+do
+# Add the keys of all the desired services to the default keytab file
+        kadmin -p root/admin -w $KDCROOTPASSWORD -q "ktadd $SERVICE/$HOSTCLIENT"
+        echo "Service $SERVICE installed"
+done
+
 
 # Adding test user
 userdel -f -r $USER1

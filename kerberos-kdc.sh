@@ -4,20 +4,19 @@
 # All common inputs in inputs.sh
 
 # Start of user inputs
+###########################################################################
 KDADMFILE="/var/kerberos/krb5kdc/kadm5.acl"
 KDCCONFFILE="/var/kerberos/krb5kdc/kdc.conf"
 KRBCONFFILE="/etc/krb5.conf"
 KRBCONFBKFILE="/etc/krb5_backup.conf"
-
-
 KDCDBPASSWORD="redhat"
 KDCROOTPASSWD="redhat"
 USER1="krbtest"
 PASSWORD1="redhat"
-
-# Firewalld must eb up and running
+# Firewalld must be up and running
 FIREWALL="yes"
 #FIREWALL="no"
+###########################################################################
 # End of user inputs
 
 source ./inputs.sh

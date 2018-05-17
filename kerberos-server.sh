@@ -1,34 +1,27 @@
 #!/bin/bash
 #
-# Setup a login server on RHEL/Centos 7 using kerberos authentication.
+# Setup a on RHEL/Centos 7 using kerberos authentication for the services defined in inputs.sh
+# It also creates the same test user - krbtest
 
 # Start of user inputs
-REALM="MYSERVER.COM"
-DOMAIN="mylabserver.com"
-IPKDC=172.31.111.114
-IPSERVER=172.31.124.129
-IPCLIENT=172.31.125.24
-HOSTS="/etc/hosts"
-HOSTKDC="garfield99996.mylabserver.com"
-HOSTSERVER="garfield99994.mylabserver.com"
-HOSTCLIENT="garfield99995.mylabserver.com"
+###########################################################################
 KRBCONFFILE="/etc/krb5.conf"
 KRBCONFBKFILE="/etc/krb5_backup.conf"
-
-
 KDCROOTPASSWORD="redhat"
 USER1="krbtest"
-
-# The host service is used for login or ssh
-SERVICE1="host/$HOSTSERVER"
+###########################################################################
 # End of user inputs
 
+source ./inputs.sh
 SERVERPACKAGES="krb5-workstation"
 
 if [[ $EUID != "0" ]]
 then
 	echo "ERROR. You need to have root privileges to run this script"
 	exit 1
+else
+	echo "Installing all the requested kerberos services on this server"
+	echo "Also creating a test user krbtest"
 fi
 
 # Comment out all existing entries for the host names from /etc/hosts
@@ -65,9 +58,13 @@ sed -i "s/#.*example.com.*=.*EXAMPLE.COM.*/$DOMAIN = $REALM/" $KRBCONFFILE
 # cleaned up
 sed -i "s/#.*EXAMPLE.COM.*/$REALM = {/" $KRBCONFFILE
 
-# Add the host service to the KDC database and save the key to a local keytab file
-kadmin -p root/admin -w $KDCROOTPASSWORD -q "addprinc -randkey $SERVICE1"
-kadmin -p root/admin -w $KDCROOTPASSWORD -q "ktadd $SERVICE1"
+for SERVICE in ${SERVICES[@]}
+do
+# Add the keys of all the desired services to the default keytab file
+	kadmin -p root/admin -w $KDCROOTPASSWORD -q "ktadd $SERVICE/$HOSTSERVER"
+	echo "Service $SERVICE installed"
+done
 
-# Add user for testing
+# Adding test user
+userdel -f -r $USER1
 useradd $USER1
