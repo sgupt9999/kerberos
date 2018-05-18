@@ -20,16 +20,18 @@ FIREWALL="yes"
 # End of user inputs
 
 source ./inputs.sh
-KDCPACKAGES="krb5-server"
+KDCPACKAGES="krb5-server pam_krb5"
 
 if [[ $EUID != "0" ]]
 then
 	echo "ERROR. You need to have root privileges to run this script"
 	exit 1
 else
+	echo "###########################################################################"
 	echo "This script will install KDC on this machine"
-	echo "It will create a testuser - krbtest"
-	echo "It will create keytab files for ( ${SERVICES[*]} ) services in the /tmp directory"
+	echo "Also creating a test user krbtest"
+	echo "###########################################################################"
+	sleep 5
 fi
 
 # Comment out all existing entries for the host names from /etc/hosts
@@ -41,7 +43,7 @@ echo "$IPSERVER $HOSTSERVER" >> $HOSTS
 echo "$IPCLIENT $HOSTCLIENT" >> $HOSTS
 
 
-if yum list installed $KDCPACKAGES > /dev/null 2>&1
+if yum list installed krb5-server > /dev/null 2>&1
 then
 	systemctl is-active -q krb5kdc && {
 		systemctl stop krb5kdc
@@ -58,7 +60,7 @@ then
 	echo "Done"
 fi
 
-echo "Installing $KDCPACKAGES"
+echo "Installing $KDCPACKAGES.........."
 yum -y -q install $KDCPACKAGES > /dev/null 2>&1
 echo "Done"
 
@@ -99,10 +101,8 @@ for SERVICE in ${SERVICES[@]}
 do
 	kadmin.local -q "delprinc -force $SERVICE/$HOSTSERVER"
 	kadmin.local -q "addprinc -randkey $SERVICE/$HOSTSERVER"
-	kadmin.local -q "ktadd -k $SERVERKEYTABFILE $SERVICE/$HOSTSERVER"
 	kadmin.local -q "delprinc -force $SERVICE/$HOSTCLIENT"
 	kadmin.local -q "addprinc -randkey $SERVICE/$HOSTCLIENT"
-	kadmin.local -q "ktadd -k $CLIENTKEYTABFILE $SERVICE/$HOSTCLIENT"
 done
 
 if [[ $FIREWALL == "yes" ]]
@@ -120,9 +120,20 @@ then
 	fi
 fi
 
+# Adding kerberos to PAM
+authconfig --enablekrb5 --update
+
+# Adding kerberos to ssh client
+sed -i 's/.*GSSAPIAuthentication.*/GSSAPIAuthentication yes/g' /etc/ssh/ssh_config
+sed -i 's/.*GSSAPIDelegateCredentials.*/GSSAPIDelegateCredentials yes/g' /etc/ssh/ssh_config
+systemctl reload sshd
+
+
 systemctl restart krb5kdc
 systemctl restart kadmin
 systemctl -q enable krb5kdc
 systemctl -q enable kadmin
 
+echo "###########################################################################"
 echo "KDC SERVER CREATED"
+echo "###########################################################################"

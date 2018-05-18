@@ -2,9 +2,9 @@
 # This file has common inputs the for the three scripts
 REALM="MYSERVER.COM"
 DOMAIN="myserver.com"
-IPKDC=172.31.17.137
-IPSERVER=172.31.30.214
-IPCLIENT=172.31.25.66
+IPKDC=34.219.176.209
+IPSERVER=54.201.74.104
+IPCLIENT=34.217.174.234
 HOSTS="/etc/hosts"
 HOSTKDC="kdc.myserver.com"
 HOSTSERVER="server.myserver.com"

@@ -13,7 +13,7 @@ USER1="krbtest"
 # End of user inputs
 
 source ./inputs.sh
-CLIENTPACKAGES="krb5-workstation"
+CLIENTPACKAGES="krb5-workstation pam_krb5"
 
 
 if [[ $EUID != "0" ]]
@@ -21,8 +21,11 @@ then
 	echo "ERROR. You need to have root privileges to run this script"
 	exit 1
 else
+	echo "###########################################################################"
 	echo "Setting up authentication for all requested kerberos services"
 	echo "Also creating a test user krbtest" 
+	echo "###########################################################################"
+	sleep 5
 fi
 
 # Comment out all existing entries for the host names from /etc/hosts
@@ -34,7 +37,7 @@ echo "$IPSERVER $HOSTSERVER" >> $HOSTS
 echo "$IPCLIENT $HOSTCLIENT" >> $HOSTS
 
 
-echo "Installing $CLIENTPACKAGES"
+echo "Installing $CLIENTPACKAGES.........."
 yum -y -q install $CLIENTPACKAGES > /dev/null 2>&1
 echo "Done"
 
@@ -63,7 +66,19 @@ do
         echo "Service $SERVICE installed"
 done
 
+# Adding kerberos to PAM
+authconfig --enablekrb5 --update
+
+# Adding kerberos to ssh client
+sed -i 's/.*GSSAPIAuthentication.*/GSSAPIAuthentication yes/g' /etc/ssh/ssh_config
+sed -i 's/.*GSSAPIDelegateCredentials.*/GSSAPIDelegateCredentials yes/g' /etc/ssh/ssh_config
+systemctl reload sshd
+
 
 # Adding test user
-userdel -f -r $USER1
+userdel -f -r $USER1 > /dev/null 2>&1
 useradd $USER1
+
+echo "###########################################################################"
+echo "CLIENT SERVER CREATED"
+echo "###########################################################################"
